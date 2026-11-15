@@ -54,8 +54,17 @@ Branch: `main`
 - **Next:** request the CSV (or analyze locally) plus scope timebase/Vpp; then test modest RAW memory depth with acquisition stopped. Do not label full application hardware-validated solely from the successful NORMAL count.
 - GitHub documentation commit follows this test; local copy should use `git pull --ff-only` before further work.
 
+## Latest test evidence — RAW acquisition and NORMAL CSV review (2026-11-15)
+- On stopped DS1054Z with active CH2/CH4, user ran: `python3 rigol_ds1054z_capture.py --host 169.254.179.79 --interface enp3s0f1 --channels 2 4 --mode raw --output test2_raw.csv`.
+- **Hardware-validated RAW transfer (CLI log):** CH2 and CH4 each completed 6,000,000/6,000,000 samples, in 24 blocks of 250,000 per channel, reporting original sample spacing 2e-06 s and 100% completion. The output was reported >1 GB; full RAW CSV was not uploaded/inspected.
+- **NORMAL CSV inspected:** user-provided `test1_normal_fixed.csv` contains exactly 2400 waveform rows (1200/channel), with indices 0..1199 contiguous on each and scope-relative time -0.98..11.01 s at 0.01 s increments. CH2 exported voltage range -0.08..8.08 V, CH4 1.76..8.00 V. These are CSV-derived values, **not** externally validated analogue amplitudes. Oscilloscope identity reported DS1054Z firmware 00.04.04.SP4.
+- **Existing optional reduction:** `--decimate N` is already present and source-implemented. N=500 would reduce a 6M-point channel to 12000 output rows and set saved spacing to 1 ms, but instrument transfer still reads all 6M points. No real-instrument decimated capture has yet been evidenced.
+- **Planned:** Consider additional `--downsample` strategies such as min/max envelope per block to retain narrow peaks; not implemented. Do not misrepresent stride decimation as anti-aliased resampling.
+- **Outstanding:** verify voltage/time against scope measurements, CSV sample integrity for RAW, real hardware `--decimate` behaviour, execute the new offline regression tests, and consider keeping large capture CSVs outside Git.
+- The docs update is newer than the user's local checkout; synchronize with `git pull --ff-only` before developing.
+
 ## Known problems / limitations
-- Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. NORMAL CLI transfer count confirmed on CH2/CH4 hardware; RAW, CSV data values, analog scale and timing still need validation.
+- Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. NORMAL CSV structure and two-channel RAW transfer counts are now confirmed; RAW CSV contents and analog/time accuracy still need validation.
 - NORMAL full-size transfer is now confirmed on hardware; short-block *rejection* remains a regression-test/software path not physically exercised.
 - Export may leave a partial CSV if a transfer fails.
 - CSV UTC timestamp is PC export time, not acquisition timestamp or PSU-aligned timestamp.
