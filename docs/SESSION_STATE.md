@@ -76,6 +76,19 @@ Branch: `main`
 - Next: build Qt frontend with channel selection, host/interface, mode/decimation, output path, progress/error reporting, settings retention and responsive capture. Add offline tests; run GUI on real workstation.
 - After this documentation update, local `main` will need `git pull --ff-only`.
 
+## Qt GUI development session — 2026-11-15
+
+- Source reviewed on GitHub before coding; main capture engine `rigol_ds1054z_capture.py` left unchanged.
+- **Implemented in committed source:** `rigol_ds1054z_gui.py` using CPX400DP-compatible PySide6/PyQt5 fallback. Input controls for host, optional interface, port, timeout, CH1–CH4, RAW/NORMAL mode, decimation, chunk points and CSV path. QProcess invokes the CLI, displays merged live output, per-channel aggregate progress, Cancel, error/completion status, overwrite confirmation, and QSettings persistence. No GUI-owned SCPI connection and no automatic acquisition START/STOP.
+- **Implemented in committed source:** `rigol_gui_core.py` pure-Python validated CLI argument builder and `test_rigol_gui_core.py` unit tests; `README.md`; `.gitignore` for generated captures and Python caches.
+- **Existing test fixes:** Updated `test_rigol_capture.py` NORMAL-mode expectation to require explicit STAR/STOP commands, matching the hardware-fixed application code; removed duplicate unittest discovery by no longer importing the `Tests` test class into `test_rigol_decimation.py`.
+- **CI setup:** `.github/workflows/offline-tests.yml` runs compileall plus unittest discovery under Python 3.12 on pushes and PRs. The latest combined commit status lookup contained no reported statuses; **do not claim a passing CI run** until the Actions run and logs are verified.
+- **Offline-tested for this revision:** Not yet independently executed; new Qt GUI and tests require actual test run. Prior successful offline source-copy tests apply to an earlier revision only.
+- **Hardware-validated for this revision:** Qt GUI not yet launched or used against an instrument. Earlier CLI tests (NORMAL 1200/channel; RAW 6M/channel; decimate 500 12000/channel; uploaded CSV index/time integrity) remain historical verified findings, but do not validate GUI behaviour.
+- **Known potential issues:** Qt binding availability depends on using the same Python interpreter as CPX400DP. Cancellation may leave a partial CSV. Progress is based on lines written to CLI output, not byte-level wire progress. Existing CSV overwrites are confirmed before capture; GUI has no waveform preview.
+- **Next:** `git pull --ff-only` on Kubuntu; run `python3 -m unittest discover -v`; launch `python3 rigol_ds1054z_gui.py` and check controls/layout, remembered values, no new dependencies, and a CH2+CH4 stopped acquisition RAW decimate-500 capture. Record terminal/GUI observations and update docs. Optionally inspect GitHub Actions status in repository.
+- GitHub HEAD after this document update is the current documentation commit (inspect `git rev-parse HEAD` locally after pull). Do not mistake earlier pinned commit SHAs in historic sections for HEAD.
+
 ## Known problems / limitations
 - Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. NORMAL CSV structure and two-channel RAW transfer counts are now confirmed; RAW CSV contents and analog/time accuracy still need validation.
 - NORMAL full-size transfer is now confirmed on hardware; short-block *rejection* remains a regression-test/software path not physically exercised.
