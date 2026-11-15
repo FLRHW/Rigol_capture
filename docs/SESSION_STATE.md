@@ -25,16 +25,16 @@ Branch: `main`
 - CLI argument validation and basic transfer errors.
 
 ## Offline-tested
-- **Tests implemented but not executed during this session.** Test scripts use mocked SCPI socket.
-- Command to run: `python3 -m unittest discover -q`.
-- Until execution results are reported, do not mark this revision as passing.
+- **PASS (isolated source-copy run, 2026-11-15):** Reconstructed the three Python files from GitHub connector source contents and ran `python3 -m unittest discover -v` in a separate container. Result: `Ran 12 tests ... OK`, exit code 0, no errors or failures. This was not a direct Git clone/check-out because internet name resolution from the execution container failed; original GitHub source was fetched through the connector. There has been no independent local-machine test.
+- Seven distinct test methods exist; five run twice under discovery because `test_rigol_decimation.py` imports `Tests` from `test_rigol_capture.py`. Fix the import to avoid duplicate discovery if desired.
+- Mock tests cover transfer chunking, waveform conversion/CSV metadata, RAW stopped-state protection, NORMAL mode, preamble mismatches and stride decimation. A pass does not verify actual instrument interoperability.
 
 ## Hardware-validated
 - **None confirmed for this committed revision.**
 - Earlier independent DS1054Z link-local routing and CH3 DC drift observations do not establish successful application waveform export.
 
 ## Known problems / limitations
-- Need actual test execution and instrument validation of RAW/NORMAL modes, data length, analog scale, timing and multi-channel behavior.
+- Tests passed in an isolated source-copy run, but still need instrument validation of RAW/NORMAL modes, data length, analog scale, timing and multi-channel behavior.
 - NORMAL-mode shorter-than-preamble first block handling is unverified on hardware.
 - Export may leave a partial CSV if a transfer fails.
 - CSV UTC timestamp is PC export time, not acquisition timestamp or PSU-aligned timestamp.
@@ -44,7 +44,7 @@ Branch: `main`
 
 ## Next steps
 1. On local machine: `cd /mnt/Data/01_Engineering/01_Projects/301_Rigol_DS1054Z/Rigol_capture && git pull --ff-only && git status && git log -3 --oneline`.
-2. Run `python3 -m unittest discover -q` locally and report full results; avoid committing generated `__pycache__` files.
+2. Optionally reproduce the offline suite locally with `python3 -m unittest discover -v`; avoid committing generated `__pycache__` files. Fix the duplicate-discovery import when next modifying tests.
 3. Check connectivity to the DS1054Z (known example: host `169.254.179.79`, interface `enp3s0f1`); stop acquisition via front panel / SINGLE completion.
 4. Run controlled single-channel RAW and NORMAL exports, comparing known safe signals against on-screen voltage/time measurements. Record sample count, scale, scope configuration, firmware, command, errors and output.
 5. Repeat on two channels; investigate transfer size, partial CSV behavior and any preamble mismatch if seen.
