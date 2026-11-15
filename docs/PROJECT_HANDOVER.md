@@ -58,5 +58,13 @@ Addresses/interfaces are examples from the developer's setup, not proof of curre
 - Linux-only interface binding feature requires compatible privileges/kernel; test the intended environment.
 - The nominal 24M-point bound is a guard, not a guarantee of scope memory depth under every channel configuration.
 
+
+
+## 2026-11-15 RAW stride-decimation hardware result
+A stopped DS1054Z with CH2 and CH4 enabled completed a RAW capture with `--decimate 500`. Each channel downloaded 6,000,000 points in 250,000-point chunks and wrote 12,000 CSV rows, reporting original spacing 2 microseconds and saved spacing 1 millisecond, without console errors. The CSV itself has not been inspected, so per-row indices, time/voltage values, and analogue accuracy remain unvalidated.
+
+## Requested next revision — desktop GUI (planned, not implemented)
+Provide a simple Kubuntu-friendly desktop front end with host/IP, network interface, channel selection, RAW/NORMAL mode, decimation factor, output path, capture progress, error reporting, and sensible safeguards. Preserve CLI behavior and the current instrument stop-state protection; do not start or stop the acquisition implicitly. Tkinter is one suitable lightweight approach; choice and details to be confirmed during implementation. A future optional peak-preserving downsampling mode may be considered, distinct from the existing stride decimation.
+
 ## Maintenance requirements
 Update this file after architecture/requirements/safety decisions and important hardware findings. Maintain `docs/SESSION_STATE.md` with actual branch/commit, what was implemented, test command/results, hardware conditions, open issues and next actions. Always distinguish implemented, offline-tested, hardware-validated and planned; compare documentation against committed source before ending development sessions. Do not rely only on conversation history.
