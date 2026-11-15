@@ -30,7 +30,7 @@ Standalone, standard-library-only Python 3 exporter for stopped Rigol DS1054Z/DS
 
 **Offline-tested:** Previously passing isolated mocked-suite run was recorded for the earlier revision (12 executions, 7 unique tests). New NORMAL range/short-block regression tests have been added since that run and **have not yet been executed** against the revised source.
 
-**Hardware-validated:** Ethernet reachability, direct NORMAL SCPI transfers of 1200 bytes, and **corrected CLI NORMAL exports of 1200 samples each on CH2 and CH4** were observed on a real stopped DS1054Z using an arbitrary applied waveform on 2026-11-15. The CLI reported 0.01 s sample spacing for each channel. CSV contents, voltage/time accuracy, and RAW export remain unverified.
+**Hardware-validated:** Ethernet reachability; corrected two-channel NORMAL CLI (1200 points each) with subsequent uploaded CSV structure/index/timestamp inspection; and two-channel RAW CLI transferring 6,000,000 samples/channel in 250,000-point chunks, all reported complete on 2026-11-15. NORMAL CSV has 2400 rows; CH2/CH4 indices 0..1199 and time -0.98..11.01 s at 0.01 s intervals. Full RAW CSV and physical voltage/time calibration remain unverified.
 
 **Planned/future investigation:** Physical validation, enhanced reliability and regression cases, documented dependencies/platform considerations, and any later integration or synchronization work (not currently a requirement).
 
@@ -51,10 +51,10 @@ Addresses/interfaces are examples from the developer's setup, not proof of curre
 - A decimated waveform cannot establish the absence of short transients; use full-resolution data for glitches.
 
 ## Known engineering limits / code-review follow-up
-- NORMAL mode two-channel CLI transfers returned the expected 1200 samples/channel on hardware; RAW chunk behavior, full CSV inspection, voltage/timing accuracy and other preamble variations remain unverified.
+- NORMAL CLI transferred 1200 samples/channel; uploaded CSV verified 2400 rows, contiguous index/time progression. RAW CLI transferred 6M samples/channel in 24 chunks per channel (250k each) at reported 2 us/sample, but raw CSV itself has not been inspected. Analog accuracy and other preamble variations remain unverified.
 - 2026-11-15 hardware finding: before the fix, NORMAL CH2/CH4 exports returned one sample each. Diagnostic showed CH2 retained `:WAV:STAR? = 5750001`, `:WAV:STOP? = 6000000`; setting `:WAV:STAR 1`, `:WAV:STOP 1200` allowed 1200 samples on both channels. Fixed in committed source by always setting ranges. Full CLI re-test subsequently succeeded with 1200 samples/channel; analog/time accuracy remains unverified.
 - The CSV records export timestamp and per-channel scope-relative times; channels are serialized during transfer, and no cross-instrument time alignment exists.
-- Potentially very large RAW CSVs, and incomplete output on mid-transfer failure.
+- RAW CSV from 12 million samples (CH2+CH4) was reported over 1 GB. Existing `--decimate N` reduces saved CSV rows while still downloading all points; e.g. N=500 gives 12000 rows/channel, 1 ms spacing at the reported 2 us original interval. This is point-stride decimation that may miss narrow events. Consider future min/max-envelope export for visual fidelity. Partial CSV may remain on transfer failure.
 - Linux-only interface binding feature requires compatible privileges/kernel; test the intended environment.
 - The nominal 24M-point bound is a guard, not a guarantee of scope memory depth under every channel configuration.
 
