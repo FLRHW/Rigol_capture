@@ -38,8 +38,16 @@ Branch: `main`
 - **NORMAL export NOT VALIDATED:** `python3 rigol_ds1054z_capture.py --host 169.254.179.79 --interface enp3s0f1 --channels 2 --mode normal --output test1_normal.csv` completed without exception, but produced only **1 sample** with reported x increment 0.01 s. Expected approximately 1200 display points with the proposed 500 us/div setup. Actual channel-display state, acquisition timebase and waveform preamble have not been confirmed. No voltage or timing check is possible from a single sample.
 - **Investigation next:** verify CH2 enabled, visible waveform and STOP after SINGLE; query `*IDN?`, `:TRIG:STAT?`, `:CHAN2:DISP?`, `:ACQ:MDEP?`, `:TIM:SCAL?`, `:WAV:SOUR?`, `:WAV:MODE?`, `:WAV:FORM?`, `:WAV:PRE?` on the existing SCPI socket. Do not conclude a code defect without the instrument responses. Avoid committing test CSV until reviewed.
 
+## Latest development — NORMAL transfer correction (2026-11-15)
+- **Hardware diagnosis:** Both CH2 and CH4 displayed an arbitrary waveform with acquisition STOP. Original NORMAL CLI returned 1 sample per channel. Direct SCPI diagnostic on CH2 found residual `:WAV:STAR? = 5750001` and `:WAV:STOP? = 6000000`. Explicitly setting 1..1200 returned 1200 samples for CH2 and CH4. Scope preamble: `0,0,1200,1,1.000000e-02,-9.800000e-01,0,8.000000e-02,-75,127`.
+- **Implemented:** `rigol_ds1054z_capture.py` now sets `:WAV:STAR` and `:WAV:STOP` explicitly for NORMAL as well as RAW, and raises on short NORMAL blocks rather than silently accepting a one-sample capture. Source commit `58ed029`.
+- **Regression tests implemented, not yet executed:** `test_rigol_capture.py` adds stale-range reset and short-block rejection tests. Test commit `27c4121`. Re-run `python3 -m unittest discover -v` against this latest revision.
+- **Verified on real instrument (direct diagnostic only):** 1200-byte NORMAL blocks on CH2 and CH4 after setting range. The revised CLI, CSV contents, analog scaling and timing are **not yet** instrument-validated.
+- **Next hardware step:** `git pull --ff-only` locally, then repeat NORMAL CLI export with `--channels 2 4 --mode normal`. Expect 1200 samples per channel; review counts, CSV timebase and voltage against the scope display. Do not treat earlier direct diagnostic as full application validation.
+- Local checkout will be behind GitHub until pulled; application source and test modifications have been committed to main. The SHA of the commit adding this SESSION_STATE update will be HEAD; check `git rev-parse HEAD` after pull.
+
 ## Known problems / limitations
-- Tests passed in an isolated source-copy run, but still need instrument validation of RAW/NORMAL modes, data length, analog scale, timing and multi-channel behavior.
+- Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. Physical CLI export still needs validation of RAW/NORMAL modes, data length, analog scale, timing and multi-channel behavior.
 - NORMAL-mode shorter-than-preamble first block handling is unverified on hardware.
 - Export may leave a partial CSV if a transfer fails.
 - CSV UTC timestamp is PC export time, not acquisition timestamp or PSU-aligned timestamp.
