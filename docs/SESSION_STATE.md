@@ -70,6 +70,12 @@ Branch: `main`
 - **Next action:** obtain `test2_raw_decimated.csv` to inspect index/time/voltage progression; develop GUI on a new revision with offline tests before instrument testing. Latest commit for this document is the current branch HEAD after this update; obtain SHA from GitHub or local `git rev-parse HEAD`.
 - Local checkout will need another `git pull --ff-only` after documentation-only commits.
 
+## Attached RAW CSV validation and GUI dependency choice — 2026-11-15
+- Uploaded `test2_raw_decimated(1).csv` inspected: 2,808,516 bytes; 24,000 data rows, 12,000/channel. CH2 and CH4 each have original sample indices 0..5,999,500 (stride 500), no gaps/duplicates; times -0.98..11.019 s at exactly 0.001 s increments. CH2 min/max 0..8.03578125 V, CH4 1.84570323..7.99804733 V. Uniform scope identity/UTC export timestamp. **Hardware-exported file structural validation PASS; absolute analogue accuracy still unverified.**
+- Inspected CPX400DP source on `FLRHW/PSU_control` `dev`, particularly `scripts/cpx400dp_gui.py`: tries PySide6 then PyQt5, uses QProcess/QThread, QSettings and common Qt widgets. Decision for planned Rigol GUI: use the same Qt binding fallback and same Python environment, keeping the current standard-library CLI unchanged. **GUI not implemented.**
+- Next: build Qt frontend with channel selection, host/interface, mode/decimation, output path, progress/error reporting, settings retention and responsive capture. Add offline tests; run GUI on real workstation.
+- After this documentation update, local `main` will need `git pull --ff-only`.
+
 ## Known problems / limitations
 - Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. NORMAL CSV structure and two-channel RAW transfer counts are now confirmed; RAW CSV contents and analog/time accuracy still need validation.
 - NORMAL full-size transfer is now confirmed on hardware; short-block *rejection* remains a regression-test/software path not physically exercised.
