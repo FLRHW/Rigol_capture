@@ -1,51 +1,62 @@
 # Rigol Capture — Project Handover
 
 Last reviewed: 2026-11-15
+Repository: `FLRHW/Rigol_capture`
 
-## Purpose and scope
-Develop a Python capture tool for the Rigol DS1054Z oscilloscope, intended to retrieve waveform data for analysis and export. Actual implemented behaviour must be verified from source after the first source upload.
+## Purpose
+Standalone, standard-library-only Python 3 exporter for stopped Rigol DS1054Z/DS1000Z waveform data over SCPI TCP. The tool exports CSV for subsequent analysis. It is independent of the CPX400DP application and does not synchronise captures to its timeline.
 
-## Local project context (not yet committed)
-The developer reports the following files in the local working directory:
-- `README.txt`
-- `README_v2_1.txt`
-- `rigol_ds1054z_capture.py`
-- `test_rigol_capture.py`
-- `test_rigol_decimation.py`
+## Repository layout
+- `rigol_ds1054z_capture.py` — CLI, TCP/SCPI transport, waveform block retrieval, conversion and streaming CSV export.
+- `test_rigol_capture.py` — simulated instrument/SCPI tests via `FakeSocket`.
+- `test_rigol_decimation.py` — decimation/index boundary tests.
+- `README.txt` — v2 RAW/NORMAL usage and workflow.
+- `README_v2_1.txt` — v2.1 stride-decimation usage and limitations.
+- `docs/PROJECT_HANDOVER.md` — durable architecture and decisions.
+- `docs/SESSION_STATE.md` — current revision, evidence, defects and next steps.
 
-Local directory: `/mnt/Data/01_Engineering/01_Projects/301_Rigol_DS1054Z/Rigol_capture`.
-These filenames indicate a working codebase and tests, but their contents and execution results are **not verified**. Do not infer supported functionality from their names.
+## Implementation architecture (source-reviewed)
+1. CLI `main()` uses `argparse` with required `--host`. Defaults: TCP port 5555, channels 2 and 4, mode `raw`, `rigol_scope.csv`, 20 s timeout, 250000-point chunk, decimation factor 1. `--interface` is optional.
+2. `Rigol` opens a TCP socket. On Linux it can bind to a specific network device via `SO_BINDTODEVICE`; otherwise it uses `socket.create_connection`. Commands are ASCII and LF-terminated. `get()` buffers incoming bytes, `readline()` handles text responses, `block()` reads IEEE 488.2 definite-length binary blocks.
+3. `*IDN?` checks that the returned identity contains `RIGOL`. RAW mode queries `:TRIG:STAT?` and only accepts STOP/STOPPED. The program does **not** issue `:RUN` or `:STOP`; the user prepares the acquisition on the oscilloscope.
+4. Per channel: `:WAV:SOUR CHANn`, `:WAV:MODE RAW` or `NORM`, `:WAV:FORM BYTE`, `:WAV:PRE?`. Preamble parser requires 10 fields, BYTE format, requested mode, positive x increment and nominal point count <=24,000,000.
+5. RAW transfer loops over inclusive, 1-based `:WAV:STAR` and `:WAV:STOP` ranges in chunks <=250000, then `:WAV:DATA?`. Unexpected block sizes raise errors. NORMAL requests `:WAV:DATA?` without STAR/STOP and tolerates a shorter initial response by adjusting expected points.
+6. Data conversion: zero-based `sample_index`; `scope_time_s = x_origin + (index - x_reference)*x_increment`; `voltage_v = (byte - y_origin - y_reference)*y_increment`. The formulas use the returned preamble; confirm scaling with real signals.
+7. CSV is written incrementally, channel by channel, with `capture_utc,scope_idn,scope_channel,sample_index,scope_time_s,voltage_v`. UTC capture timestamp is a PC-side export time, **not** a shared acquisition timestamp. File is not atomic; on error partial output may remain.
+8. `--decimate N` retains samples where original zero-based index modulo N equals zero across chunk boundaries. **All samples are still downloaded**; only output rows are reduced. This is stride selection without anti-alias filtering and may miss short pulses.
 
-## Record-keeping policy
-- The committed repository is the authority for implemented features; uncommitted local work must be identified separately.
-- Maintain this file for architecture, requirements, engineering decisions, safety constraints, and durable historical findings.
-- Maintain `docs/SESSION_STATE.md` for current branch/commit, implementation, test evidence, known issues, and next actions.
-- Update both after significant changes and hardware tests. Before ending a session, compare the documents with the actual committed code.
-- Never treat ChatGPT history as the only record of important project knowledge.
+## Current implementation vs verification
+**Implemented in source:** CLI, TCP transport, RAW and NORMAL modes, stopped check for RAW, BYTE preamble parsing, chunking, CSV scaling, streaming output, decimation and basic error guards.
 
-## Status definitions
-- **Implemented:** present in committed source (not necessarily tested).
-- **Offline-tested:** verified without the actual instrument, with evidence and revision recorded.
-- **Hardware-validated:** exercised on a real oscilloscope, with test conditions, observed results and revision recorded.
-- **Planned:** not implemented in committed application source.
+**Offline-tested:** Unit tests exist, using mock socket replies, for chunks, sample scaling, CLI CSV/metadata, RUN rejection, NORMAL, preamble mode rejection and decimation boundaries. Results have **not** been independently executed/recorded for the committed revision.
 
-## Architecture and requirements
-Pending review of the existing local Python scripts and READMEs after they are committed. Record instrument transport, SCPI commands, capture modes, data scaling and raw formats, metadata, exports, CLI/GUI behaviour, dependencies, failure/retry handling, and test procedures as verified.
+**Hardware-validated:** No capture session with a real DS1054Z has been confirmed against the committed revision.
 
-## Historical instrument observations (not capture-tool validation)
-- Instrument: Rigol DS1054Z.
-- Separate Ethernet work used a link-local `169.254.x.x` arrangement; application communication has not been confirmed.
-- CH3 previously exhibited slow or drifting DC readings near a 25 V stimulus, while CH2 read correctly. The cause remains unresolved. Keep hardware anomaly investigation distinct from capture-tool software testing.
+**Planned/future investigation:** Physical validation, enhanced reliability and regression cases, documented dependencies/platform considerations, and any later integration or synchronization work (not currently a requirement).
 
-## Engineering and safety constraints
-- Confirm probe attenuation, permitted input voltages, grounding and test setup using manufacturer guidance before attaching signals.
-- Retain acquisition parameters and waveform scaling metadata; never silently label incomplete or invalid transfers as valid.
-- Report transport/SCPI errors and disconnections explicitly.
-- These are **design constraints**, not claims of implemented safeguards.
+## Usage
+```bash
+python3 rigol_ds1054z_capture.py --host 169.254.179.79 --interface enp3s0f1 --channels 2 4 --mode raw --output rigol_raw.csv
+python3 rigol_ds1054z_capture.py --host 169.254.179.79 --channels 2 4 --mode normal --output rigol_screen.csv
+python3 rigol_ds1054z_capture.py --host 169.254.179.79 --interface enp3s0f1 --channels 2 --mode raw --decimate 500 --output rigol_reduced.csv
+python3 -m unittest discover -q
+```
+Addresses/interfaces are examples from the developer's setup, not proof of current connectivity.
 
-## Significant-change checklist
-1. Reconcile this document with actual source and significant design decisions.
-2. Record exact branch and HEAD SHA, tests, equipment setup and remaining issues in `SESSION_STATE.md`.
-3. Separate implemented, offline-tested, hardware-validated, and planned work.
-4. Document reproducible tests, especially instrument observations.
-5. Confirm documentation matches committed code before calling a session complete.
+## Historical observations / safety
+- Rigol DS1054Z connected in separate experiments using link-local IP `169.254.179.79`, Linux interface `enp3s0f1` and PC address `169.254.179.80`. Confirm actual routing before testing.
+- Separate hardware investigation: CH3 voltage at approximately 25 V DC was observed slowly rising/drifting while CH2 behaved normally; unresolved and not evidence of capture-tool behavior.
+- Confirm input limits, probe/attenuator settings, shared-earth grounding and safe signal sources before tests; do not rely on software protection.
+- RAW requires the instrument already stopped; avoid modifying acquisition conditions while downloading and preserve original captures until CSV integrity is checked.
+- A decimated waveform cannot establish the absence of short transients; use full-resolution data for glitches.
+
+## Known engineering limits / code-review follow-up
+- No real-instrument verification of SCPI block lengths, preamble variations, multi-channel settings, timing and scaling.
+- NORMAL handling of a shorter first block needs a physical instrument check.
+- The CSV records export timestamp and per-channel scope-relative times; channels are serialized during transfer, and no cross-instrument time alignment exists.
+- Potentially very large RAW CSVs, and incomplete output on mid-transfer failure.
+- Linux-only interface binding feature requires compatible privileges/kernel; test the intended environment.
+- The nominal 24M-point bound is a guard, not a guarantee of scope memory depth under every channel configuration.
+
+## Maintenance requirements
+Update this file after architecture/requirements/safety decisions and important hardware findings. Maintain `docs/SESSION_STATE.md` with actual branch/commit, what was implemented, test command/results, hardware conditions, open issues and next actions. Always distinguish implemented, offline-tested, hardware-validated and planned; compare documentation against committed source before ending development sessions. Do not rely only on conversation history.
