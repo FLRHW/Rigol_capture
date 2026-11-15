@@ -20,7 +20,7 @@ Standalone, standard-library-only Python 3 exporter for stopped Rigol DS1054Z/DS
 2. `Rigol` opens a TCP socket. On Linux it can bind to a specific network device via `SO_BINDTODEVICE`; otherwise it uses `socket.create_connection`. Commands are ASCII and LF-terminated. `get()` buffers incoming bytes, `readline()` handles text responses, `block()` reads IEEE 488.2 definite-length binary blocks.
 3. `*IDN?` checks that the returned identity contains `RIGOL`. RAW mode queries `:TRIG:STAT?` and only accepts STOP/STOPPED. The program does **not** issue `:RUN` or `:STOP`; the user prepares the acquisition on the oscilloscope.
 4. Per channel: `:WAV:SOUR CHANn`, `:WAV:MODE RAW` or `NORM`, `:WAV:FORM BYTE`, `:WAV:PRE?`. Preamble parser requires 10 fields, BYTE format, requested mode, positive x increment and nominal point count <=24,000,000.
-5. RAW transfer loops over inclusive, 1-based `:WAV:STAR` and `:WAV:STOP` ranges in chunks <=250000, then `:WAV:DATA?`. Unexpected block sizes raise errors. NORMAL requests `:WAV:DATA?` without STAR/STOP and tolerates a shorter initial response by adjusting expected points.
+5. Both RAW and NORMAL transfer loops explicitly set inclusive, 1-based `:WAV:STAR` and `:WAV:STOP` ranges before `:WAV:DATA?` in chunks <=250000. Unexpected block sizes raise errors, including a short NORMAL response. This fixes the previous dependence on stale instrument readout ranges.
 6. Data conversion: zero-based `sample_index`; `scope_time_s = x_origin + (index - x_reference)*x_increment`; `voltage_v = (byte - y_origin - y_reference)*y_increment`. The formulas use the returned preamble; confirm scaling with real signals.
 7. CSV is written incrementally, channel by channel, with `capture_utc,scope_idn,scope_channel,sample_index,scope_time_s,voltage_v`. UTC capture timestamp is a PC-side export time, **not** a shared acquisition timestamp. File is not atomic; on error partial output may remain.
 8. `--decimate N` retains samples where original zero-based index modulo N equals zero across chunk boundaries. **All samples are still downloaded**; only output rows are reduced. This is stride selection without anti-alias filtering and may miss short pulses.
@@ -28,9 +28,9 @@ Standalone, standard-library-only Python 3 exporter for stopped Rigol DS1054Z/DS
 ## Current implementation vs verification
 **Implemented in source:** CLI, TCP transport, RAW and NORMAL modes, stopped check for RAW, BYTE preamble parsing, chunking, CSV scaling, streaming output, decimation and basic error guards.
 
-**Offline-tested:** Unit tests exist, using mock socket replies, for chunks, sample scaling, CLI CSV/metadata, RUN rejection, NORMAL, preamble mode rejection and decimation boundaries. Results have **not** been independently executed/recorded for the committed revision.
+**Offline-tested:** Previously passing isolated mocked-suite run was recorded for the earlier revision (12 executions, 7 unique tests). New NORMAL range/short-block regression tests have been added since that run and **have not yet been executed** against the revised source.
 
-**Hardware-validated:** No capture session with a real DS1054Z has been confirmed against the committed revision.
+**Hardware-validated:** Ethernet reachability and direct NORMAL SCPI transfers of 1200 bytes on CH2 and CH4 were observed on a real DS1054Z. The full revised CLI export and voltage/timing conversion have **not** yet been hardware validated.
 
 **Planned/future investigation:** Physical validation, enhanced reliability and regression cases, documented dependencies/platform considerations, and any later integration or synchronization work (not currently a requirement).
 
@@ -52,7 +52,7 @@ Addresses/interfaces are examples from the developer's setup, not proof of curre
 
 ## Known engineering limits / code-review follow-up
 - No real-instrument verification of SCPI block lengths, preamble variations, multi-channel settings, timing and scaling.
-- NORMAL handling of a shorter first block needs a physical instrument check.
+- 2026-11-15 hardware finding: before the fix, NORMAL CH2/CH4 exports returned one sample each. Diagnostic showed CH2 retained `:WAV:STAR? = 5750001`, `:WAV:STOP? = 6000000`; setting `:WAV:STAR 1`, `:WAV:STOP 1200` allowed 1200 samples on both channels. Fixed in committed source by always setting ranges, but a full CLI re-test remains outstanding.
 - The CSV records export timestamp and per-channel scope-relative times; channels are serialized during transfer, and no cross-instrument time alignment exists.
 - Potentially very large RAW CSVs, and incomplete output on mid-transfer failure.
 - Linux-only interface binding feature requires compatible privileges/kernel; test the intended environment.
