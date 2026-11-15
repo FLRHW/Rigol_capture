@@ -66,5 +66,12 @@ A stopped DS1054Z with CH2 and CH4 enabled completed a RAW capture with `--decim
 ## Requested next revision — desktop GUI (planned, not implemented)
 Provide a simple Kubuntu-friendly desktop front end with host/IP, network interface, channel selection, RAW/NORMAL mode, decimation factor, output path, capture progress, error reporting, and sensible safeguards. Preserve CLI behavior and the current instrument stop-state protection; do not start or stop the acquisition implicitly. Tkinter is one suitable lightweight approach; choice and details to be confirmed during implementation. A future optional peak-preserving downsampling mode may be considered, distinct from the existing stride decimation.
 
+
+## 2026-11-15 uploaded decimated CSV inspection
+The supplied `test2_raw_decimated(1).csv` was inspected programmatically (2,808,516 bytes). Exactly 24,000 data rows, 12,000 each for CH2 and CH4. Both channels have zero missing/duplicate steps: original sample indices 0 through 5,999,500, in increments of 500; time -0.98 through 11.019 seconds, increments of 0.001 s. CH2 voltages range 0.0 to 8.03578125 V, CH4 1.84570323 to 7.99804733 V. Each row includes the same Rigol DS1054Z instrument identity and UTC export timestamp; the values are not externally calibrated. File structure and progression **validated**, absolute voltage accuracy **not validated**.
+
+## GUI dependency decision
+Reuse the same Qt bindings already supported by the CPX400DP controller: attempt `PySide6` first, fall back to `PyQt5`; retain the CLI capture module as a standard-library-only independent backend. CPX400DP `scripts/cpx400dp_gui.py` on `dev` uses QProcess/QThread, QSettings, QFileDialog, QComboBox, QCheckBox, QProgressBar. The Rigol GUI should use these patterns, without a separate GUI toolkit. Running in the same Python environment avoids additional GUI dependency installation. GUI is **planned, not implemented**.
+
 ## Maintenance requirements
 Update this file after architecture/requirements/safety decisions and important hardware findings. Maintain `docs/SESSION_STATE.md` with actual branch/commit, what was implemented, test command/results, hardware conditions, open issues and next actions. Always distinguish implemented, offline-tested, hardware-validated and planned; compare documentation against committed source before ending development sessions. Do not rely only on conversation history.
