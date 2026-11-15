@@ -1,0 +1,6 @@
+# Generated captures can be large; keep them outside version control.
+/captures/
+/test*.csv
+/__pycache__/
+*.py[cod]
+.pytest_cache/
