@@ -46,9 +46,17 @@ Branch: `main`
 - **Next hardware step:** `git pull --ff-only` locally, then repeat NORMAL CLI export with `--channels 2 4 --mode normal`. Expect 1200 samples per channel; review counts, CSV timebase and voltage against the scope display. Do not treat earlier direct diagnostic as full application validation.
 - Local checkout will be behind GitHub until pulled; application source and test modifications have been committed to main. The SHA of the commit adding this SESSION_STATE update will be HEAD; check `git rev-parse HEAD` after pull.
 
+## Hardware retest — NORMAL CLI successful (2026-11-15)
+- User confirmed CH2 and CH4 both displayed the supplied arbitrary waveform with acquisition STOP.
+- After the NORMAL range fix, command: `python3 rigol_ds1054z_capture.py --host 169.254.179.79 --interface enp3s0f1 --channels 2 4 --mode normal --output test1_normal_fixed.csv`.
+- **Hardware-validated transfer count:** CH2 `1200/1200` and CH4 `1200/1200`, both 100%, decimate 1, no CLI errors; reported original/saved interval `0.01 s` per channel. Expected 2400 waveform rows plus CSV header, but file itself has **not** been inspected.
+- **Not yet validated:** CSV values and row/index/time ordering, voltage and timing accuracy against display, RAW transfers, scope memory handling, and multi-chunk hardware transfers.
+- **Next:** request the CSV (or analyze locally) plus scope timebase/Vpp; then test modest RAW memory depth with acquisition stopped. Do not label full application hardware-validated solely from the successful NORMAL count.
+- GitHub documentation commit follows this test; local copy should use `git pull --ff-only` before further work.
+
 ## Known problems / limitations
-- Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. Physical CLI export still needs validation of RAW/NORMAL modes, data length, analog scale, timing and multi-channel behavior.
-- NORMAL-mode shorter-than-preamble first block handling is unverified on hardware.
+- Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. NORMAL CLI transfer count confirmed on CH2/CH4 hardware; RAW, CSV data values, analog scale and timing still need validation.
+- NORMAL full-size transfer is now confirmed on hardware; short-block *rejection* remains a regression-test/software path not physically exercised.
 - Export may leave a partial CSV if a transfer fails.
 - CSV UTC timestamp is PC export time, not acquisition timestamp or PSU-aligned timestamp.
 - Decimation reduces CSV rows only, not Ethernet transfer time; stride decimation can miss narrow pulses.
