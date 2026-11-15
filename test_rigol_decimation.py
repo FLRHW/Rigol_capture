@@ -2,13 +2,19 @@
 import csv
 import io
 import unittest
-from test_rigol_capture import FakeSocket, Tests
+from unittest.mock import patch
+from rigol_ds1054z_capture import Rigol
+from test_rigol_capture import FakeSocket
 
 
 class DecimationTests(unittest.TestCase):
+    def session(self, fake):
+        with patch('rigol_ds1054z_capture.socket.create_connection', return_value=fake):
+            return Rigol('169.254.179.79')
+
     def test_chunk_boundary_and_preserved_times(self):
         fake = FakeSocket(count=17)
-        session = Tests().session(fake)
+        session = self.session(fake)
         text = io.StringIO()
         exported, dx = session.export_channel(csv.writer(text), 2, 'raw', 'time', 'RIGOL',
                                               chunk_points=3, decimate=5)
@@ -21,7 +27,7 @@ class DecimationTests(unittest.TestCase):
 
     def test_bad_decimation(self):
         fake = FakeSocket(count=3)
-        session = Tests().session(fake)
+        session = self.session(fake)
         with self.assertRaisesRegex(ValueError, 'Decimation'):
             session.export_channel(csv.writer(io.StringIO()),2,'raw','time','RIGOL', decimate=0)
 
