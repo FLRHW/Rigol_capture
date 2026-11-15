@@ -30,7 +30,7 @@ Standalone, standard-library-only Python 3 exporter for stopped Rigol DS1054Z/DS
 
 **Offline-tested:** Previously passing isolated mocked-suite run was recorded for the earlier revision (12 executions, 7 unique tests). New NORMAL range/short-block regression tests have been added since that run and **have not yet been executed** against the revised source.
 
-**Hardware-validated:** Ethernet reachability and direct NORMAL SCPI transfers of 1200 bytes on CH2 and CH4 were observed on a real DS1054Z. The full revised CLI export and voltage/timing conversion have **not** yet been hardware validated.
+**Hardware-validated:** Ethernet reachability, direct NORMAL SCPI transfers of 1200 bytes, and **corrected CLI NORMAL exports of 1200 samples each on CH2 and CH4** were observed on a real stopped DS1054Z using an arbitrary applied waveform on 2026-11-15. The CLI reported 0.01 s sample spacing for each channel. CSV contents, voltage/time accuracy, and RAW export remain unverified.
 
 **Planned/future investigation:** Physical validation, enhanced reliability and regression cases, documented dependencies/platform considerations, and any later integration or synchronization work (not currently a requirement).
 
@@ -51,8 +51,8 @@ Addresses/interfaces are examples from the developer's setup, not proof of curre
 - A decimated waveform cannot establish the absence of short transients; use full-resolution data for glitches.
 
 ## Known engineering limits / code-review follow-up
-- No real-instrument verification of SCPI block lengths, preamble variations, multi-channel settings, timing and scaling.
-- 2026-11-15 hardware finding: before the fix, NORMAL CH2/CH4 exports returned one sample each. Diagnostic showed CH2 retained `:WAV:STAR? = 5750001`, `:WAV:STOP? = 6000000`; setting `:WAV:STAR 1`, `:WAV:STOP 1200` allowed 1200 samples on both channels. Fixed in committed source by always setting ranges, but a full CLI re-test remains outstanding.
+- NORMAL mode two-channel CLI transfers returned the expected 1200 samples/channel on hardware; RAW chunk behavior, full CSV inspection, voltage/timing accuracy and other preamble variations remain unverified.
+- 2026-11-15 hardware finding: before the fix, NORMAL CH2/CH4 exports returned one sample each. Diagnostic showed CH2 retained `:WAV:STAR? = 5750001`, `:WAV:STOP? = 6000000`; setting `:WAV:STAR 1`, `:WAV:STOP 1200` allowed 1200 samples on both channels. Fixed in committed source by always setting ranges. Full CLI re-test subsequently succeeded with 1200 samples/channel; analog/time accuracy remains unverified.
 - The CSV records export timestamp and per-channel scope-relative times; channels are serialized during transfer, and no cross-instrument time alignment exists.
 - Potentially very large RAW CSVs, and incomplete output on mid-transfer failure.
 - Linux-only interface binding feature requires compatible privileges/kernel; test the intended environment.
