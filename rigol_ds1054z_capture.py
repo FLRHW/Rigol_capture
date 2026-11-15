@@ -117,18 +117,15 @@ class Rigol:
         written = 0
         while written < points:
             size = min(chunk_points, points-written)
-            if mode == 'raw':
-                # Rigol start/stop are inclusive and 1-based.
-                self.command(f':WAV:STAR {written + 1}')
-                self.command(f':WAV:STOP {written + size}')
+            # Set the readout window in BOTH modes. NORMAL mode otherwise
+            # inherits stale RAW :WAV:STAR/:WAV:STOP values from earlier transfers
+            # and may return a single byte despite a 1200-point preamble.
+            # Rigol start/stop indices are inclusive and 1-based.
+            self.command(f':WAV:STAR {written + 1}')
+            self.command(f':WAV:STOP {written + size}')
             raw = self.block(':WAV:DATA?')
             if len(raw) != size:
-                # NORM display may return fewer points than preamble; never
-                # silently invent/duplicate points or misalign further blocks.
-                if mode == 'normal' and written == 0 and len(raw) > 0:
-                    points = len(raw)
-                else:
-                    raise ValueError(f'CH{channel}: requested {size} points at {written + 1}, got {len(raw)}')
+                raise ValueError(f'CH{channel}: requested {size} points at {written + 1}, got {len(raw)}')
             # Apply a global sample-index stride across RAW chunk boundaries.
             # Original timestamps and sample indices are preserved.
             for i, byte in enumerate(raw):
