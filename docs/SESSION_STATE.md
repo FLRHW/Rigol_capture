@@ -63,6 +63,13 @@ Branch: `main`
 - **Outstanding:** verify voltage/time against scope measurements, CSV sample integrity for RAW, real hardware `--decimate` behaviour, execute the new offline regression tests, and consider keeping large capture CSVs outside Git.
 - The docs update is newer than the user's local checkout; synchronize with `git pull --ff-only` before developing.
 
+## Latest hardware test — RAW decimation (2026-11-15)
+- After `git pull --ff-only` reported already up to date, user ran `python3 rigol_ds1054z_capture.py --host 169.254.179.79 --interface enp3s0f1 --channels 2 4 --mode raw --decimate 500 --output test2_raw_decimated.csv` on the stopped Rigol.
+- **Hardware-validated transfer and reduction counts:** CH2 and CH4 each completed 6,000,000/6,000,000 retrieved samples in 24 blocks of 250,000, writing 12,000 rows/channel at 1 ms reported output spacing (original 2 us); no console errors. Expected CSV data rows: 24,000. No independent CSV file inspection or voltage/time accuracy check yet.
+- **Planned next revision:** desktop GUI exposing host/interface, channel boxes, RAW/NORMAL mode, decimation, CSV output, progress and errors, while preserving the existing command-line engine and stopped-acquisition safeguard. No GUI committed yet.
+- **Next action:** obtain `test2_raw_decimated.csv` to inspect index/time/voltage progression; develop GUI on a new revision with offline tests before instrument testing. Latest commit for this document is the current branch HEAD after this update; obtain SHA from GitHub or local `git rev-parse HEAD`.
+- Local checkout will need another `git pull --ff-only` after documentation-only commits.
+
 ## Known problems / limitations
 - Earlier isolated source-copy test suite passed before the NORMAL fix; updated regression tests require execution. NORMAL CSV structure and two-channel RAW transfer counts are now confirmed; RAW CSV contents and analog/time accuracy still need validation.
 - NORMAL full-size transfer is now confirmed on hardware; short-block *rejection* remains a regression-test/software path not physically exercised.
