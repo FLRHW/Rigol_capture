@@ -77,7 +77,8 @@ class Tests(unittest.TestCase):
         scope=self.session(fake)
         out=io.StringIO(); count,dt=scope.export_channel(csv.writer(out),2,'normal','stamp','RIGOL')
         self.assertEqual(count,3)
-        self.assertNotIn(':WAV:STAR 1',fake.sent)
+        self.assertIn(':WAV:STAR 1',fake.sent)
+        self.assertIn(':WAV:STOP 3',fake.sent)
         self.assertEqual(len(list(csv.reader(io.StringIO(out.getvalue())))),3)
     def test_normal_resets_stale_raw_range(self):
         fake = FakeSocket(count=7, mode='normal')
