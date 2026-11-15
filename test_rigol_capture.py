@@ -79,6 +79,32 @@ class Tests(unittest.TestCase):
         self.assertEqual(count,3)
         self.assertNotIn(':WAV:STAR 1',fake.sent)
         self.assertEqual(len(list(csv.reader(io.StringIO(out.getvalue())))),3)
+    def test_normal_resets_stale_raw_range(self):
+        fake = FakeSocket(count=7, mode='normal')
+        # Simulate residual waveform transfer settings from a prior RAW capture.
+        fake.start = 5_750_001
+        fake.stop = 6_000_000
+        scope = self.session(fake)
+        out = io.StringIO()
+        count, _ = scope.export_channel(csv.writer(out), 2, 'normal', 'stamp', 'RIGOL')
+        self.assertEqual(count, 7)
+        self.assertIn(':WAV:STAR 1', fake.sent)
+        self.assertIn(':WAV:STOP 7', fake.sent)
+        self.assertEqual(len(list(csv.reader(io.StringIO(out.getvalue())))), 7)
+
+    def test_normal_rejects_short_block(self):
+        class ShortReplySocket(FakeSocket):
+            def sendall(self, data):
+                if data.decode().strip() == ':WAV:DATA?':
+                    self.sent.append(':WAV:DATA?')
+                    self.pending.extend(b'#11' + bytes([100]) + b'\\n')
+                else:
+                    super().sendall(data)
+        fake = ShortReplySocket(count=3, mode='normal')
+        scope = self.session(fake)
+        with self.assertRaisesRegex(ValueError, 'requested 3 points'):
+            scope.export_channel(csv.writer(io.StringIO()), 2, 'normal', 'stamp', 'RIGOL')
+
     def test_reject_unexpected_mode(self):
         fake=FakeSocket(count=3,mode='normal')
         scope=self.session(fake)
