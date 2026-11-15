@@ -33,6 +33,11 @@ Branch: `main`
 - **None confirmed for this committed revision.**
 - Earlier independent DS1054Z link-local routing and CH3 DC drift observations do not establish successful application waveform export.
 
+## Hardware validation in progress — 2026-11-15
+- **Ethernet reachability PASS:** PC `169.254.179.80` on `enp3s0f1` pinged scope `169.254.179.79`: 3/3 packets, 0% loss, mean RTT 0.262 ms.
+- **NORMAL export NOT VALIDATED:** `python3 rigol_ds1054z_capture.py --host 169.254.179.79 --interface enp3s0f1 --channels 2 --mode normal --output test1_normal.csv` completed without exception, but produced only **1 sample** with reported x increment 0.01 s. Expected approximately 1200 display points with the proposed 500 us/div setup. Actual channel-display state, acquisition timebase and waveform preamble have not been confirmed. No voltage or timing check is possible from a single sample.
+- **Investigation next:** verify CH2 enabled, visible waveform and STOP after SINGLE; query `*IDN?`, `:TRIG:STAT?`, `:CHAN2:DISP?`, `:ACQ:MDEP?`, `:TIM:SCAL?`, `:WAV:SOUR?`, `:WAV:MODE?`, `:WAV:FORM?`, `:WAV:PRE?` on the existing SCPI socket. Do not conclude a code defect without the instrument responses. Avoid committing test CSV until reviewed.
+
 ## Known problems / limitations
 - Tests passed in an isolated source-copy run, but still need instrument validation of RAW/NORMAL modes, data length, analog scale, timing and multi-channel behavior.
 - NORMAL-mode shorter-than-preamble first block handling is unverified on hardware.
