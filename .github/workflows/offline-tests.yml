@@ -15,6 +15,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Compile Python source
-        run: python -m compileall -q rigol_ds1054z_capture.py rigol_ds1054z_gui.py rigol_gui_core.py test_rigol_capture.py test_rigol_decimation.py test_rigol_gui_core.py
+        run: python -m compileall -q rigol_ds1054z_capture.py rigol_ds1054z_gui.py rigol_gui_core.py rigol_network.py test_rigol_capture.py test_rigol_decimation.py test_rigol_gui_core.py test_rigol_network.py
       - name: Run offline unit tests (no oscilloscope required)
         run: python -m unittest discover -v
