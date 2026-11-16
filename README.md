@@ -10,11 +10,11 @@ The GUI reuses the Qt bindings used by the [CPX400DP PSU controller](https://git
 python3 rigol_ds1054z_gui.py
 ```
 
-Select host and optional Linux interface, channels CH1–CH4, RAW or NORMAL mode, decimation factor, transfer chunk size and CSV output location. Choose **Capture waveform**. The progress bar tracks channel transfer completion. Connection errors and status appear in the console pane. **Cancel transfer** terminates the subprocess; a partially written CSV may remain.
+Enter the scope IP/host, select CH1–CH4, RAW or NORMAL mode, stride decimation factor and CSV output. Choose **Capture waveform**. The GUI automatically checks the Linux route and verifies `*IDN?`, trying other active IPv4 interfaces if required. The selected network device is shown in the console. **No interface or port entry is normally required.** Open **Advanced connection settings** only to override the Ethernet interface, TCP port (default 5555), socket timeout or chunk size. The progress bar tracks channel transfer completion. Connection errors and status appear in the console pane. **Cancel transfer** terminates the subprocess; a partially written CSV may remain.
 
-The GUI remembers settings between launches using Qt's QSettings.
+The GUI remembers settings between launches using Qt's QSettings. Existing installations migrate to automatic interface selection instead of reusing their previously saved manual interface; an explicitly entered new Advanced override is remembered.
 
-The GUI never changes oscilloscope RUN/STOP state. Prepare acquisition on the oscilloscope and STOP it (or wait for SINGLE to complete) before RAW export. It never issues commands directly to the instrument; it launches the existing CLI engine as a subprocess.
+The identity probe opens and closes a short SCPI connection before capture, while the capture subprocess owns the active transfer connection. The GUI never changes oscilloscope RUN/STOP state. Prepare acquisition on the oscilloscope and STOP it (or wait for SINGLE to complete) before RAW export. It never issues commands directly to the instrument; it launches the existing CLI engine as a subprocess.
 
 ## CLI (no GUI dependency)
 
