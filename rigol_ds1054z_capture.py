@@ -125,7 +125,21 @@ class Rigol:
             self.command(f':WAV:STOP {written + size}')
             raw = self.block(':WAV:DATA?')
             if len(raw) != size:
-                raise ValueError(f'CH{channel}: requested {size} points at {written + 1}, got {len(raw)}')
+                # block() has already consumed the complete IEEE488.2
+                # definite-length reply; this is a *scope-reported* short
+                # waveform block, not a short recv() or CSV decimation.
+                # Never silently accept it, pad it, or assume the first
+                # bytes represent the requested beginning of the window.
+                raise ValueError(
+                    f'CH{channel} {mode.upper()}: waveform block size mismatch: '
+                    f'requested {size} BYTE samples for SCPI range '
+                    f'{written + 1}..{written + size} (preamble {points} points), '
+                    f'scope returned {len(raw)} BYTE samples. '
+                    'The entire SCPI binary reply was received. '
+                    'Capture stopped; no missing samples fabricated. '
+                    'Try CH-only with a smaller Advanced chunk size (e.g. 128), '
+                    'then compare the two-channel capture. '
+                    'A partial CSV may remain; do not treat it as a full capture.')
             # Apply a global sample-index stride across RAW chunk boundaries.
             # Original timestamps and sample indices are preserved.
             for i, byte in enumerate(raw):
