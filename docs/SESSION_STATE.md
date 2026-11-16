@@ -4,6 +4,33 @@ Last reviewed: 2026-11-16
 Repository: `FLRHW/Rigol_capture`
 Branch: `main`
 
+## 2026-11-16 — CH4 smaller RAW capture hardware PASS
+
+After aborting an impractically slow 12-million-point transfer
+with 128-sample chunks, the user reduced acquisition depth and
+repeated with **CH4 only**, RAW mode, decimation 1 and 1,200
+points per block. The user-supplied console output confirms:
+
+- Instrument: `RIGOL TECHNOLOGIES,DS1054Z,DS1ZA221303251,00.04.04.SP4`
+- Network path: automatic system route
+- Five transfers: 1,200 / 2,400 / 3,600 / 4,800 / 6,000 of
+  6,000 total samples
+- 6,000/6,000 acquired; all 6,000 exported, decimation 1
+- Original/saved sample interval `0.0004 s`
+- CSV: `captures/rigol_scope.csv` on the user's computer
+- No capture errors reported. CSV bytes and voltage calibration
+  have not been independently inspected.
+
+**Inference:** CH4 is capable of returning full 1,200-point blocks.
+The earlier 128-byte response to a 1,200-point request was
+not a universal fixed CH4 transfer limit; it remains intermittent
+or conditional. Recommended next short test is CH2 **then** CH4
+in the same stopped small-depth acquisition, 1,200-point chunks,
+decimation 1 and a distinct output file, to see whether the
+two-channel sequence triggers the mismatch. No reason to repeat
+multi-million-point 128-sample transfers; avoid such expensive tests
+unless specifically warranted.
+
 ## 2026-11-16 — Intermittent short SCPI waveform block, independent DSRemote troubleshooting
 
 **Live user capture observation:** Rigol DS1054Z firmware `00.04.04.SP4`
