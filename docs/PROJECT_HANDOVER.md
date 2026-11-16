@@ -3,6 +3,36 @@
 Last reviewed: 2026-11-16
 Repository: `FLRHW/Rigol_capture`
 
+## 2026-11-16 — Two-channel small-depth RAW capture PASS
+
+User followed the successful CH4-only test with CH2 and CH4 together
+in a single stopped acquisition. Both channels reported:
+
+- `6,000/6,000` points acquired and 6,000 rows exported
+- Five 1,200-point blocks per channel; 10 complete blocks in total
+- `--decimate 1`, saved/original spacing `0.0004 s`
+- Verified Rigol DS1054Z `DS1ZA221303251` firmware `00.04.04.SP4`,
+  connected via automatic system route
+- No transfer exceptions reported
+- Output file on user's machine:
+  `captures/rigol_scopech2ch4.csv`
+
+**Hardware-validated conclusion:** The existing RAW capture engine can
+switch from CH2 to CH4 and retrieve five consecutive complete 1,200-byte
+blocks on each channel. The earlier `CH4 requested 1200, got 128`
+was not caused by a universally unsupported 1,200-point block size,
+or by every CH2-to-CH4 source transition. Causes remain unverified;
+possibilities include changing acquisition state, stale waveform window
+settings, and instrument transfer behaviour. A successful modest
+stopped capture also does not prove continuous DSRemote waveform
+streaming will succeed. Do not prescribe slow 128-point chunking
+for multimillion-point acquisitions.
+
+**Next recommendation:** Avoid repeating this already validated small
+test. Investigate DSRemote separately, or use a moderately larger RAW
+capture if needed, keeping the scope stopped, preserving exact SCPI
+block discrepancy messages and using manageable chunk sizes.
+
 ## 2026-11-16 — CH4 smaller RAW capture hardware PASS
 
 After aborting an impractically slow 12-million-point transfer
