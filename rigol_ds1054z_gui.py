@@ -108,6 +108,8 @@ class CaptureWindow(QMainWindow):
         self.timeout.setDecimals(1)
         self.timeout.setSuffix(" s")
         self.timeout.setValue(20)
+        self.port.valueChanged.connect(self._update_connection_hint)
+        self.interface.textChanged.connect(self._update_connection_hint)
         network.addWidget(QLabel("Port"))
         network.addWidget(self.port)
         network.addSpacing(12)
@@ -187,6 +189,11 @@ class CaptureWindow(QMainWindow):
         self.console.setReadOnly(True)
         layout.addWidget(self.console, 1)
 
+    def _update_connection_hint(self, *unused):
+        selected = self.interface.text().strip()
+        label = f"Manual: {selected}" if selected else "Automatic"
+        self.auto_info.setText(f"Interface: {label} • Port: {self.port.value()}")
+
     def _toggle_advanced(self, expanded):
         self.advanced_panel.setVisible(expanded)
         self.advanced_button.setText(
@@ -210,6 +217,7 @@ class CaptureWindow(QMainWindow):
         self.output.setText(str(self.settings.value(
             "output", str(HERE / "captures" / "rigol_scope.csv")
         )))
+        self._update_connection_hint()
 
     def _save_settings(self):
         for key, value in (
