@@ -103,7 +103,7 @@ class Tests(unittest.TestCase):
                     super().sendall(data)
         fake = ShortReplySocket(count=3, mode='normal')
         scope = self.session(fake)
-        with self.assertRaisesRegex(ValueError, 'requested 3 points'):
+        with self.assertRaisesRegex(ValueError, 'requested 3 BYTE samples'):
             scope.export_channel(csv.writer(io.StringIO()), 2, 'normal', 'stamp', 'RIGOL')
 
     def test_short_block_diagnostic_is_explicit_and_never_silent(self):
