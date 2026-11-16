@@ -106,6 +106,27 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'requested 3 points'):
             scope.export_channel(csv.writer(io.StringIO()), 2, 'normal', 'stamp', 'RIGOL')
 
+    def test_short_block_diagnostic_is_explicit_and_never_silent(self):
+        class ShortBlock(FakeSocket):
+            def sendall(self, data):
+                if data.decode().strip() == ':WAV:DATA?':
+                    self.sent.append(':WAV:DATA?')
+                    payload = bytes([100] * 128)
+                    self.pending.extend(b'#3128' + payload + b'\\n')
+                else:
+                    super().sendall(data)
+        fake = ShortBlock(count=1200)
+        scope = self.session(fake)
+        out = io.StringIO()
+        with self.assertRaises(ValueError) as caught:
+            scope.export_channel(csv.writer(out), 4, 'raw', 'stamp', 'RIGOL')
+        msg = str(caught.exception)
+        for value in ('CH4 RAW', '1200 BYTE', '1..1200',
+                      '128 BYTE', 'entire SCPI binary reply',
+                      'partial CSV'):
+            self.assertIn(value, msg)
+        self.assertEqual(out.getvalue(), '')
+
     def test_reject_unexpected_mode(self):
         fake=FakeSocket(count=3,mode='normal')
         scope=self.session(fake)
