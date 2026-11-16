@@ -1,8 +1,51 @@
 # Rigol Capture — Session State
 
-Last reviewed: 2026-11-15
+Last reviewed: 2026-11-16
 Repository: `FLRHW/Rigol_capture`
 Branch: `main`
+
+## 2026-11-16 — Intermittent short SCPI waveform block, independent DSRemote troubleshooting
+
+**Live user capture observation:** Rigol DS1054Z firmware `00.04.04.SP4`
+identified over Ethernet on automatic system route; CH2 captured 940/940 RAW
+points, decimation=1, with full CSV rows at 0.002 s original spacing.
+CH4's preamble advertised 1,200 points, but a `:WAV:DATA?` request for the
+1-based range 1..1200 returned an **entire IEEE488.2 binary block of only
+128 BYTE samples**. The exporter raised:
+`ValueError: CH4: requested 1200 points at 1, got 128`.
+No evidence of TCP recv truncation: `Rigol.block()` reads the length
+advertised in the block header and then that number of bytes. The
+scope may have a transient/limited waveform buffer or returned a different
+readout than the preamble describes; root cause is **not yet proven**.
+
+**Context:** Separate DSRemote program connected and read waveform for a
+few seconds after repairing a lost Rigol /32 route, then repeatedly failed
+at `screen_thread.cpp line 783` while the physical scope continued
+operating normally. DSRemote's failure was also reproduced with the
+CPX400DP GUI closed. Independent waveform capture can succeed in
+small batches, so network reachability alone does not validate ongoing
+waveform transfers.
+
+**Safe code change on main:** `rigol_ds1054z_capture.py` now reports
+the channel, mode, requested inclusive SCPI point range, preamble count
+and returned binary block length in the short-block exception. It
+explicitly refuses to fabricate missing samples or silently accept
+a truncated capture. Test `test_rigol_capture.py` adds a mocked
+1200-vs-128 failure and updates the existing NORMAL short-block
+assertion. Actual waveform acquisition/CSV scaling and :RUN/:STOP
+safeguards have **not been modified**.
+
+**Next controlled tests:** with both Ethernet routes checked and
+DSRemote disconnected, capture CH4 alone in RAW mode with advanced
+chunk size **128** and decimation 1; then CH2+CH4 using the same
+chunk size, watching for short blocks. Capture again in NORMAL mode
+if RAW remains inconsistent. Do not restart or alter the oscilloscope
+acquisition during an active RAW export. Record scope STOP state,
+channel display enable, returned point counts and exact errors.
+Small-chunk success is evidence about the transfer window, **not**
+proof of DSRemote root cause or indefinite transport stability.
+An exception can leave a partially written CSV; preserve any
+complete prior capture under a different filename.
 
 ## Git revision / synchronization
 - Application source reviewed at `dd25ba1` (developer's clean local `main` and `origin/main` at that revision).
