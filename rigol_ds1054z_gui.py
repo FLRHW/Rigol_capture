@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 try:
-    from PySide6.QtCore import QProcess, QSettings, QTimer
+    from PySide6.QtCore import QProcess, QSettings, QTimer, QThread, Signal
     from PySide6.QtWidgets import (
         QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
         QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
@@ -20,7 +20,7 @@ try:
     QT_LIBRARY = "PySide6"
 except ImportError:
     try:
-        from PyQt5.QtCore import QProcess, QSettings, QTimer
+        from PyQt5.QtCore import QProcess, QSettings, QTimer, QThread, pyqtSignal as Signal
         from PyQt5.QtWidgets import (
             QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
@@ -40,6 +40,26 @@ PROGRESS_RE = re.compile(r"^CH([1-4]): (\d+)/(\d+) points \(([\d.]+)%\)$")
 
 
 from rigol_gui_core import capture_arguments
+from rigol_network import find_interface
+
+
+class ProbeWorker(QThread):
+    verified = Signal(object, str)
+    failed = Signal(str)
+
+    def __init__(self, host, port, override, parent=None):
+        super().__init__(parent)
+        self.host, self.port, self.override = host, port, override
+
+    def run(self):
+        try:
+            interface, identity = find_interface(
+                self.host, port=self.port, override=self.override, timeout=2.0
+            )
+        except Exception as exc:
+            self.failed.emit(str(exc))
+        else:
+            self.verified.emit(interface, identity)
 
 
 class CaptureWindow(QMainWindow):
@@ -49,6 +69,7 @@ class CaptureWindow(QMainWindow):
         self.resize(780, 660)
         self.settings = QSettings("FLRHW", "RigolCapture")
         self.process = None
+        self.probe = None
         self.pending_lines = ""
         self.cancel_requested = False
         self.progress_by_channel = {}
@@ -64,9 +85,19 @@ class CaptureWindow(QMainWindow):
         self.host = QLineEdit()
         self.host.setPlaceholderText("169.254.179.79")
         form.addRow("Oscilloscope host", self.host)
+        self.auto_info = QLabel("Interface: Automatic • Port: 5555")
+        form.addRow("Connection", self.auto_info)
+
+        self.advanced_button = QPushButton("Advanced connection settings ▸")
+        self.advanced_button.setCheckable(True)
+        self.advanced_button.toggled.connect(self._toggle_advanced)
+        layout.addLayout(form)
+        layout.addWidget(self.advanced_button)
+        self.advanced_panel = QWidget()
+        advanced_form = QFormLayout(self.advanced_panel)
         self.interface = QLineEdit()
-        self.interface.setPlaceholderText("Optional, e.g. enp3s0f1")
-        form.addRow("Network interface", self.interface)
+        self.interface.setPlaceholderText("Leave blank for automatic detection")
+        advanced_form.addRow("Manual interface override", self.interface)
 
         network = QHBoxLayout()
         self.port = QSpinBox()
@@ -83,8 +114,9 @@ class CaptureWindow(QMainWindow):
         network.addWidget(QLabel("Socket timeout"))
         network.addWidget(self.timeout)
         network.addStretch()
-        form.addRow("Connection", network)
-        layout.addLayout(form)
+        advanced_form.addRow("SCPI connection", network)
+        self.advanced_panel.setVisible(False)
+        layout.addWidget(self.advanced_panel)
 
         options = QGroupBox("Capture settings")
         opts = QGridLayout(options)
@@ -117,8 +149,7 @@ class CaptureWindow(QMainWindow):
         self.chunk = QSpinBox()
         self.chunk.setRange(1, 250000)
         self.chunk.setValue(250000)
-        opts.addWidget(QLabel("Transfer chunk (points)"), 3, 0)
-        opts.addWidget(self.chunk, 3, 1)
+        advanced_form.addRow("Transfer chunk (points)", self.chunk)
         layout.addWidget(options)
 
         output_row = QHBoxLayout()
@@ -156,9 +187,17 @@ class CaptureWindow(QMainWindow):
         self.console.setReadOnly(True)
         layout.addWidget(self.console, 1)
 
+    def _toggle_advanced(self, expanded):
+        self.advanced_panel.setVisible(expanded)
+        self.advanced_button.setText(
+            "Advanced connection settings ▾" if expanded
+            else "Advanced connection settings ▸"
+        )
+
     def _load_settings(self):
         self.host.setText(str(self.settings.value("host", "169.254.179.79")))
-        self.interface.setText(str(self.settings.value("interface", "enp3s0f1")))
+        # The old fixed-interface setting is deliberately not migrated.
+        self.interface.setText(str(self.settings.value("manual_interface", "")))
         self.port.setValue(int(self.settings.value("port", 5555)))
         self.timeout.setValue(float(self.settings.value("timeout", 20)))
         self.chunk.setValue(int(self.settings.value("chunk", 250000)))
@@ -175,7 +214,7 @@ class CaptureWindow(QMainWindow):
     def _save_settings(self):
         for key, value in (
             ("host", self.host.text().strip()),
-            ("interface", self.interface.text().strip()),
+            ("manual_interface", self.interface.text().strip()),
             ("port", self.port.value()),
             ("timeout", self.timeout.value()),
             ("chunk", self.chunk.value()),
@@ -200,15 +239,16 @@ class CaptureWindow(QMainWindow):
     def _set_running(self, running):
         for control in (
             self.host, self.interface, self.port, self.timeout, self.mode,
+            self.advanced_button,
             self.decimate, self.chunk, self.output, self.browse,
             *self.channels.values(),
         ):
             control.setEnabled(not running)
         self.start_button.setEnabled(not running)
-        self.cancel_button.setEnabled(running)
+        self.cancel_button.setEnabled(running and self.process is not None)
 
     def _start(self):
-        if self.process is not None:
+        if self.process is not None or self.probe is not None:
             return
         self.expected_channels = [ch for ch, cb in self.channels.items() if cb.isChecked()]
         try:
@@ -234,16 +274,44 @@ class CaptureWindow(QMainWindow):
         self.progress_by_channel = {}
         self.cancel_requested = False
         self.progress.setValue(0)
-        self.status.setText("Connecting / waiting for instrument…")
+        self.status.setText("Detecting network interface and verifying Rigol…")
+        self._set_running(True)
+        self.probe = ProbeWorker(
+            self.host.text().strip(), self.port.value(),
+            self.interface.text().strip(), self
+        )
+        self.probe.verified.connect(self._probe_verified)
+        self.probe.failed.connect(self._probe_failed)
+        self.probe.finished.connect(self._probe_done)
+        self.probe.start()
+
+    def _probe_verified(self, interface, identity):
+        self._append(f"Instrument verified: {identity}")
+        self._append(f"Network path: {interface or 'automatic system route'}")
+        self.status.setText("Connected — beginning waveform transfer")
+        args = capture_arguments(
+            self.host.text(), interface or "", self.expected_channels,
+            self.mode.currentData(), self.decimate.value(), self.output.text(),
+            self.port.value(), self.timeout.value(), self.chunk.value(),
+        )
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.MergedChannels)
         self.process.setWorkingDirectory(str(HERE))
         self.process.readyReadStandardOutput.connect(self._read_output)
         self.process.finished.connect(self._finished)
         self.process.errorOccurred.connect(self._process_error)
-        self._set_running(True)
+        self.cancel_button.setEnabled(True)
         # -u forces progress lines out promptly, even when subprocess output is piped.
         self.process.start(sys.executable, ["-u", str(BACKEND), *args])
+
+    def _probe_failed(self, error):
+        self._append("Connection failed: " + error)
+        self.status.setText("Connection failed; check host or Advanced settings")
+        self._set_running(False)
+
+    def _probe_done(self):
+        self.probe.deleteLater()
+        self.probe = None
 
     def _read_output(self):
         if self.process is None:
@@ -308,7 +376,7 @@ class CaptureWindow(QMainWindow):
         self.process = None
 
     def closeEvent(self, event):
-        if self.process is not None:
+        if self.process is not None or self.probe is not None:
             QMessageBox.warning(
                 self, "Capture in progress",
                 "Cancel the transfer before closing. Partial CSV files may remain."
